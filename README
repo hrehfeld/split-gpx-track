@@ -1,0 +1,13 @@
+usage: split-gpx [-h] [--pauses] [--excluded] [--split] ingpx outgpx
+
+split gpx files where gps position cuts off
+
+positional arguments:
+  ingpx       Input gpx
+  outgpx      Output gpx
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --pauses    Include pause tracks
+  --excluded  Include excluded tracks
+  --split     Each track into its own file
