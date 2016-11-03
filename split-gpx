@@ -52,11 +52,11 @@ def haversine(lon1, lat1, lon2, lat2):
     return km
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="split gpx files where gps position cuts off")
+    parser = argparse.ArgumentParser(description="Detect pauses in a monolithic gpx track and split it into segments.")
     parser.add_argument('ingpx', help="Input gpx")
     parser.add_argument('outgpx', help="Output gpx")
     parser.add_argument('--pauses', help="Include pause tracks", action='store_true')
-    parser.add_argument('--excluded', help="Include excluded tracks", action='store_true')
+    parser.add_argument('--excluded', help="Include tracks that are too short, too near, too slow", action='store_true')
     parser.add_argument('--split', help="Each track into its own file", action='store_true')
     args = parser.parse_args()
 
