@@ -1,0 +1,31 @@
+* Split GPX Tracks into Segments at pauses
+
+
+=split-gpx-track= detects pauses in a monolithic gpx track and splits it into segments. It can also detect and remove tracks that are too short or too slow.
+
+Your usecase is something like this:
+- you track GPS-positions continuously with something like [[https://github.com/redfish64/TinyTravelTracker][Tiny Travel Tracker]]
+- you now have one monolithic GPX track that's missing info where you had your GPS device off.
+- software that can edit large amounts of GPS positions with a sensible UI is hard to come by
+- you want to remove idle times, pauses and gaps
+
+* Usage
+#+begin_src
+usage: split-gpx [-h] [--pauses] [--excluded] [--split] ingpx outgpx
+
+Detect pauses in a monolithic gpx track and split it into segments.
+
+positional arguments:
+  ingpx       Input gpx
+  outgpx      Output gpx
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --pauses    Include pause tracks
+  --excluded  Include tracks that are too short, too near, too slow
+  --split     Each track into its own file
+#+end_src
+
+* Alternatives
+- This gist seems to [[https://gist.github.com/dal/4416699][split tracks where points are too far away from each other]].
+
