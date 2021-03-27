@@ -7,49 +7,73 @@ from pathlib import Path
 
 import math
 
-#lenghts/distances are in km
+# lenghts/distances are in km
 
-#pauses need to be at least this long
+# pauses need to be at least this long
 pause_min_timedelta = timedelta(hours=1.5)
-#pauses cant be faster than
+# pauses cant be faster than
 pause_max_velocity = 2
-#time gap of this length forces start of a new track
+# time gap of this length forces start of a new track
 route_max_timedelta = timedelta(hours=4)
-#exclude tracks shorter than
+# exclude tracks shorter than
 route_min_dist = 0.4
 route_min_duration = timedelta(minutes=5)
 route_min_velocity = 1
-#distance between points to check
-#(tune this according to your gps precision)
+# distance between points to check
+# (tune this according to your gps precision)
 points_moved_dist = 0.15
-#maximum allowed distance for any point to check
+# maximum allowed distance for any point to check
 points_max_dist = points_moved_dist + 0.5
 
+name_timeformat = '%Y-%m-%d-%H-%M'
 
-name_timeformat = '%Y-%m-%d %H:%M'
 
 def vel(d, dt):
     s = dt.seconds
     if s == 0:
-        assert(d < 1)
+        assert (d < 1)
         return 0
-    return d / s * 60 * 60                    
+    return d / s * 60 * 60
+
 
 def haversine(lon1, lat1, lon2, lat2):
     """
-    Calculate the great circle distance between two points 
+    Calculate the great circle distance between two points
     on the earth (specified in decimal degrees).
     Source: http://gis.stackexchange.com/a/56589/15183
     """
-    # convert decimal degrees to radians 
+    # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
-    # haversine formula 
-    dlon = lon2 - lon1 
-    dlat = lat2 - lat1 
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.asin(math.sqrt(a)) 
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.asin(math.sqrt(a))
     km = 6367 * c
     return km
+
+
+def add_track(comment, start, end):
+    # include last and pause point
+    ps = pts[start[2]:end[2] + 1]
+    tracks.append(ps)
+    start_end.append((comment, start[1], end[1]))
+    dist = end[3] - start[3]
+    distances.append(dist)
+
+    dt = end[1] - start[1]
+    assert (dt.seconds >= 0)
+    velocity = vel(dist, dt)
+
+    reason = '%s\t(%s km,\t%s,\t%s km/h)\twith %s points' % (
+        comment
+        , round(dist, 2)
+        , dt
+        , round(velocity, 2)
+        , len(ps)
+    )
+
+    print(reason)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Detect pauses in a monolithic gpx track and split it into segments.")
@@ -64,7 +88,7 @@ if __name__ == '__main__':
         'gpx': 'http://www.topografix.com/GPX/1/1'
     }
 
-    early = datetime(year=1970,day=1,month=1)
+    early = datetime(year=1970, day=1, month=1)
 
     tree = et.parse(args.ingpx)
     et.register_namespace('', ns['gpx'])
@@ -81,24 +105,26 @@ if __name__ == '__main__':
             pts = seg.findall('gpx:trkpt', ns)
             for ipt, pt in enumerate(pts):
                 t = pt.find('gpx:time', ns).text
-                #'2016-08-14T12:36:24.312Z'
-                #fixme: parse float seconds
-                assert(t[-1] == 'Z')
-                assert(t[-5] == '.')
-                t = datetime.strptime(t[:-5], '%Y-%m-%dT%H:%M:%S')
+                # '2016-08-14T12:36:24.312Z'
+                # fixme: parse float seconds
+                assert (t[-1] == 'Z')
+                if t[-5] == '.':
+                    t = datetime.strptime(t[:-5], '%Y-%m-%dT%H:%M:%S')
+                else:
+                    t = datetime.strptime(t[:-1], '%Y-%m-%dT%H:%M:%S')
 
                 pos = [float(x) for x in [pt.attrib['lon'], pt.attrib['lat']]]
 
                 route_d = haversine(*route[-1][0], *pos) if route else 999999
 
-                #we have enough distance from last point
+                # we have enough distance from last point
                 moved = route_d > points_moved_dist
                 pause_start = None
                 if route and moved:
                     dt = (t - route[-1][1])
-                    assert(dt.seconds >= 0)
+                    assert (dt.seconds >= 0)
                     velocity = vel(route_d, dt)
-                    #last point was long ago, and we didnt travel during this time
+                    # last point was long ago, and we didnt travel during this time
                     if (dt > pause_min_timedelta and velocity < pause_max_velocity) or dt > route_max_timedelta:
                         pause_start = route[-1]
 
@@ -111,29 +137,10 @@ if __name__ == '__main__':
                     #     , ipt - pause_start[2]
                     #     ))
 
-                    def add_track(comment, start, end):
-                        #include last and pause point
-                        ps = pts[start[2]:end[2] + 1]
-                        tracks.append(ps)
-                        start_end.append((comment, start[1], end[1]))
-                        dist = end[3] - start[3]
-                        distances.append(dist)
 
-                        dt = end[1] - start[1]
-                        assert(dt.seconds >= 0)
-                        velocity = vel(dist, dt)
 
-                        reason = '%s\t(%s km,\t%s,\t%s km/h)\twith %s points' % (
-                            comment
-                            , round(dist, 2)
-                            , dt
-                            , round(velocity, 2)
-                            , len(ps)
-                        )
 
-                        print(reason)
-                        
-                    if True: #maxdist > remove_diff_dist:
+                    if True:  # maxdist > remove_diff_dist:
                         comment = ''
                         d = pause_start[3] - route_start[3]
                         dt = pause_start[1] - route_start[1]
@@ -152,21 +159,19 @@ if __name__ == '__main__':
                     route_start = last
                     route = [last]
                 else:
-                    #remove moved route points
+                    # remove moved route points
                     for io, o in enumerate(route):
                         d = haversine(*o[0], *pos)
                         dt = (t - o[1])
                         if d < points_max_dist or dt < pause_min_timedelta:
-                            #remove moved away points unless they're recent
+                            # remove moved away points unless they're recent
                             route = route[io:]
                             break
-
 
                 dist = 0
                 if last:
                     d = haversine(*last[0], *pos)
                     dist = last[3] + d
-                    
 
                 last = pos, t, ipt, dist
                 if moved:
@@ -178,20 +183,21 @@ if __name__ == '__main__':
                 add_track('', route_start, last)
         gpx.remove(trk)
     print(len(tracks))
-    assert(len(tracks) == len(start_end))
+    assert (len(tracks) == len(start_end))
     for i, (pts, time, dist) in enumerate(zip(tracks, start_end, distances)):
         trk = et.SubElement(gpx, 'trk')
         name = et.SubElement(trk, 'name')
-        name.text = time[0] + ' - '.join([t.strftime(name_timeformat) for t in time[1:]]) + ' ' + str(round(dist, 2)) + ' km'
+        name.text = time[0] + ' - '.join([t.strftime(name_timeformat) for t in time[1:]]) + ' ' + str(
+            round(dist, 2)) + ' km'
         seg = et.SubElement(trk, 'trkseg')
         for pt in pts:
             seg.append(pt)
         if args.split:
             outf = Path(args.outgpx)
-            outf = Path(outf.stem + str(i) + str(time[1])).with_suffix(outf.suffix)
+            outf = outf.with_name(outf.stem + str(i) + str(time[1].strftime(name_timeformat))).with_suffix(outf.suffix)
             print(outf)
             tree.write(str(outf), encoding='utf-8', xml_declaration=True)
             gpx.remove(trk)
-            
+
     if not args.split:
         tree.write(args.outgpx, encoding='utf-8', xml_declaration=True)
