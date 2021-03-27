@@ -81,6 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('outgpx', help="Output gpx")
     parser.add_argument('--pauses', help="Include pause tracks", action='store_true')
     parser.add_argument('--excluded', help="Include tracks that are too short, too near, too slow", action='store_true')
+    parser.add_argument('--excludeby', help="Exclude tracks only by specific reasons:short,near,slow")
     parser.add_argument('--split', help="Each track into its own file", action='store_true')
     args = parser.parse_args()
 
@@ -150,7 +151,7 @@ if __name__ == '__main__':
                             comment = 'short'
                         elif vel(d, dt) < route_min_velocity:
                             comment = 'slow'
-                        if not comment or args.excluded:
+                        if not comment or args.excluded or (args.excludeby and not comment in args.excludeby):
                             add_track(comment, route_start, pause_start)
 
                         if last[2] > pause_start[2] and args.pauses:
