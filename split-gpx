@@ -4,29 +4,44 @@ import xml.etree.ElementTree as et
 import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
-
+import re
 import math
 
 # lenghts/distances are in km
 
-# pauses need to be at least this long
-pause_min_timedelta = timedelta(hours=1.5)
-# pauses cant be faster than
-pause_max_velocity = 2
-# time gap of this length forces start of a new track
-route_max_timedelta = timedelta(hours=4)
-# exclude tracks shorter than
-route_min_dist = 0.4
-route_min_duration = timedelta(minutes=5)
-route_min_velocity = 1
-# distance between points to check
-# (tune this according to your gps precision)
-points_moved_dist = 0.15
-# maximum allowed distance for any point to check
-points_max_dist = points_moved_dist + 0.5
-
 
 name_timeformat = '%Y-%m-%d %H:%M'
+
+time_units = dict(
+    ms='milliseconds',
+    s='seconds',
+    m='minutes',
+    h='hours',
+    d='days',
+    w='weeks',
+)
+default_time_unit = 'm'
+
+
+duration_re = re.compile(r'^(\d+)\s*(' + '|'.join(list(time_units.keys()) + list(time_units.values())) + r')?$')
+
+
+def duration(s):
+    s = s.strip()
+
+    m = duration_re.match(s)
+    if not m:
+        raise ValueError(f'malformed duration: {s}. Use {duration_re}.')
+
+    num = m.group(1)
+    unit = m.group(2)
+
+    num = float(num)
+    if unit in time_units:
+        unit = time_units[unit]
+    kwargs = {unit: num}
+    return timedelta(**kwargs)
+
 
 
 def vel(d, dt):
@@ -72,7 +87,31 @@ if __name__ == '__main__':
     parser.add_argument(
         '--split', help="Each track into its own file", action='store_true'
     )
+
+    parser.add_argument('--pause-duration-min', help='Pauses need to be at least this long.', default=timedelta(hours=1.5), type=duration)
+    parser.add_argument('--pause-velocity-max', help='While GPS signal is lost, recognize pause only when speed between points is below this value. (km/h)', default=2, type=float)
+    points_moved_dist_default = 0.15
+    parser.add_argument('--pause-distance-max', help='Max distance between consecutive points of a pause. Tune this according to your GPS precision.', default=points_moved_dist_default, type=float)
+    # distance between points to check
+    # (tune this according to your gps precision)
+    # TODO better docu
+    parser.add_argument('--route-distance-max', help='Maximum allowed distance for any point to check.', default=points_moved_dist_default + 0.5, type=float)
+    parser.add_argument('--route-max-gap-duration', help='Time gap of this length forces start of a new track', default=timedelta(hours=4), type=duration)
+    parser.add_argument('--route-length-min', help='Exclude tracks shorter than this value. (km)', default=0.4, type=float)
+    parser.add_argument('--route-duration-min', help='Exclude tracks shorter than this value. (duration)', default=timedelta(minutes=5), type=duration)
+    parser.add_argument('--route-velocity-min', help='Exclude tracks slower than this value. (km/h)', default=0.4, type=float)
+
+
     args = parser.parse_args()
+
+    points_max_dist = args.pause_distance_max
+    points_moved_dist = args.route_distance_max
+    pause_min_timedelta = args.pause_duration_min
+    pause_max_velocity = args.pause_velocity_max
+    route_max_timedelta = args.route_max_gap_duration
+    route_min_dist = args.route_length_min
+    route_min_duration = args.route_duration_min
+    route_min_velocity = args.route_velocity_min
 
     ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
 
